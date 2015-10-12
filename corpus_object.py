@@ -66,16 +66,22 @@ class MyCorpus():
 		first_level_zip_file, second_level_zip_file = self.archive_file_list[zip_file_index]
 		file_name_section = second_level_zip_file.rsplit('/',1)[1].split('.')[0]
 		XML_path = file_name_section + '/' + file_name_section + ".XML"
-		print XML_path
-		
-		with zipfile.ZipFile(first_level_zip_file) as z:
-			with z.open(second_level_zip_file) as z2:
-				z2_filedata = cStringIO.StringIO(z2.read())
-				with zipfile.ZipFile(z2_filedata) as nested_zip:
-					filename_end = XML_path.rsplit('/', 1)[1]
+		if first_level_a_file.endswith(".zip"):
+			with zipfile.ZipFile(first_level_a_file) as z:
+				with z.open(second_level_a_file) as z2:
+					z2_filedata = cStringIO.StringIO(z2.read())
+					#if second_level_a_file.endswith(".zip"): - add here second check for second level tar files
+					with zipfile.ZipFile(z2_filedata) as nested_zip:
+						with nested_zip.open(XML_path) as xml_file:
+							xml_tree = parseString(xml_file.read())
+					#elif second_level_a_file.endswith(".tar"): -to add
+		elif first_level_a_file.endswith(".tar"):
+			with tarfile.TarFile(first_level_a_file) as z:
+				z2 = z.extractfile(second_level_a_file)
+				#z2_filedata = cStringIO.StringIO(z2.read())
+				with zipfile.ZipFile(z2) as nested_zip:
 					with nested_zip.open(XML_path) as xml_file:
 						xml_tree = parseString(xml_file.read())
-		#Return minidom DOM object
 		return xml_tree
 
 
