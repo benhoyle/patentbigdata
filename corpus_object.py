@@ -30,8 +30,7 @@ class MyCorpus():
 	def get_archive_list(self):
 		#Class function to generate a list of lower level archive files
 		for filename in self.first_level_files:
-			if filename.endswith(".zip"):
-				print "zip: " + filename
+			if filename.lower().endswith(".zip"):
 				try:
 					#Look to see if we have already processed
 					if filename not in self.processed_fl_files:
@@ -41,8 +40,7 @@ class MyCorpus():
 				except Exception, ex:
 					#Log error
 					logging.exception("Exception opening file:" + str(filename))
-			elif filename.endswith(".tar"):
-				print "tar: " + filename
+			elif filename.lower().endswith(".tar"):
 				try:
 					#Look to see if we have already processed
 					if filename not in self.processed_fl_files:
@@ -51,22 +49,20 @@ class MyCorpus():
 						names = current_file.getnames()
 						current_file.close()
 						afl = [(filename, name) for name in names if name.lower().endswith(self.exten) and self.FILE_FORMAT_RE.match(name)]
-						print len(afl)
 						self.archive_file_list += afl
-						print len(self.archive_file_list)
 						self.processed_fl_files.append(filename)
 				except Exception, ex:
 					#Log error
 					logging.exception("Exception opening file:" + str(filename))
 
-	def read_xml(self, zip_file_index):
+	def read_xml(self, a_file_index):
 		#Functions reads XML from a particular zip file (second_level_zip_file)
 		#that is nested within a first zip file (first_level_zip_file)
 		#Takes an index to a file within the zip_file_list array
-		first_level_zip_file, second_level_zip_file = self.archive_file_list[zip_file_index]
-		file_name_section = second_level_zip_file.rsplit('/',1)[1].split('.')[0]
+		first_level_a_file, second_level_a_file = self.archive_file_list[a_file_index]
+		file_name_section = second_level_a_file.rsplit('/',1)[1].split('.')[0]
 		XML_path = file_name_section + '/' + file_name_section + ".XML"
-		if first_level_a_file.endswith(".zip"):
+		if first_level_a_file.lower().endswith(".zip"):
 			with zipfile.ZipFile(first_level_a_file) as z:
 				with z.open(second_level_a_file) as z2:
 					z2_filedata = cStringIO.StringIO(z2.read())
@@ -75,7 +71,7 @@ class MyCorpus():
 						with nested_zip.open(XML_path) as xml_file:
 							xml_tree = parseString(xml_file.read())
 					#elif second_level_a_file.endswith(".tar"): -to add
-		elif first_level_a_file.endswith(".tar"):
+		elif first_level_a_file.lower().endswith(".tar"):
 			with tarfile.TarFile(first_level_a_file) as z:
 				z2 = z.extractfile(second_level_a_file)
 				#z2_filedata = cStringIO.StringIO(z2.read())
