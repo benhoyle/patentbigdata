@@ -11,11 +11,16 @@ import cStringIO
 #Library for XML Parsing
 from xml.dom.minidom import parseString
 
-#test_path= "/media/SAMSUNG/Patent Downloads/2001"
+#Library for text analysis
+from nltk.tokenize import word_tokenize, sent_tokenize
+from nltk.probability import FreqDist
+from nltk import stem
+
+#test_path= "/media/SAMSUNG/Patent_Downloads/2001"
 
 class MyCorpus():
 	#Creates a new corpus object that simplifies processing of patent archive
-	def __init__(self, path="/media/SAMSUNG/Patent Downloads"):
+	def __init__(self, path="/media/SAMSUNG/Patent_Downloads"):
 		logging.basicConfig(filename="processing_class.log", format='%(asctime)s %(message)s')
 		self.exten = (".zip",".tar")
 		self.path = path
@@ -80,6 +85,50 @@ class MyCorpus():
 						xml_tree = parseString(xml_file.read())
 		return xml_tree
 
+	def __get_text(self, elem, string=""):
+		#Recursive function used to get text from XML DOM
+		#Check if element has a text node
+		if elem.hasChildNodes():
+			for child in elem.childNodes:
+				if child.nodeName == '#text':
+					string = string + child.nodeValue
+				else:
+					string = self.__get_text(child, string)		
+		return string
+
+	def extract_text(self, xml_tree):
+		/home/ben/Dropbox/Work/Big Data/TF-IDF/corpus_object.py
+		text_string = ""
+		for elem in xml_tree.getElementsByTagName("title-of-invention"):
+			out_str = self.__get_text(elem)
+			text_string = text_string + out_str + "\n"
+		for elem in xml_tree.getElementsByTagName("paragraph"):
+			out_str = self.__get_text(elem)
+			text_string = text_string + out_str + "\n"
+		for elem in xml_tree.getElementsByTagName("claim"):
+			out_str = self.__get_text(elem)
+			text_string = text_string + out_str + "\n"
+		return text_string
+
+	def ie_process(self, text_string):
+		global f_dist
+		words = word_tokenize(text_string)
+		
+		porter = stem.porter.PorterStemmer()
+		#stem here? - stemming using porter
+		vocab = [porter.stem(w.lower()) for w in words if w.isalpha()]
+		
+		#add to FreqDist here?
+		for stem_word in vocab:
+			f_dist.inc(stem_word)
+			
+		#Save state in picke file
+		with open("freqdist.pkl", "wb") as f:
+			pickle.dump(f_dist, f)
+
+	def save_string(self, text_string, text_filename):
+		with open(text_filename, 'w') as f:
+			f.write(text_string)
 
  
 
