@@ -1,6 +1,7 @@
 import os
 import logging
 import re
+import math
 
 #Libraries for Zip file processing
 import zipfile
@@ -15,6 +16,7 @@ from xml.dom.minidom import parseString
 from nltk.tokenize import word_tokenize, sent_tokenize
 from nltk.probability import FreqDist
 from nltk import stem
+from nltk.corpus import stopwords
 
 #test_path= "/media/SAMSUNG/Patent_Downloads/2001"
 
@@ -31,6 +33,9 @@ class MyCorpus():
 		#Initialise arrays for lower level files
 		self.processed_fl_files = []
 		self.archive_file_list = []
+		
+		#Set English stopwords
+		self.stopwords = stopwords.words('english')
 
 	def get_archive_list(self):
 		#Class function to generate a list of lower level archive files
@@ -97,7 +102,7 @@ class MyCorpus():
 		return string
 
 	def extract_text(self, xml_tree):
-		/home/ben/Dropbox/Work/Big Data/TF-IDF/corpus_object.py
+		#Function to extract text from an XML DOM object
 		text_string = ""
 		for elem in xml_tree.getElementsByTagName("title-of-invention"):
 			out_str = self.__get_text(elem)
@@ -110,25 +115,98 @@ class MyCorpus():
 			text_string = text_string + out_str + "\n"
 		return text_string
 
-	def ie_process(self, text_string):
-		global f_dist
-		words = word_tokenize(text_string)
-		
-		porter = stem.porter.PorterStemmer()
-		#stem here? - stemming using porter
-		vocab = [porter.stem(w.lower()) for w in words if w.isalpha()]
-		
-		#add to FreqDist here?
-		for stem_word in vocab:
-			f_dist.inc(stem_word)
-			
-		#Save state in picke file
-		with open("freqdist.pkl", "wb") as f:
-			pickle.dump(f_dist, f)
+#Should the word processing functions below go in a separate module?
+	def __get_words(self, text_string):
+		#Tokenize text into words / punctuation and
+		#clean words to remove punctuation and english stopwords / place in lower case
+		clean_words = [w.lower() for w in word_tokenize(text_string) if w.isalpha() and w.lower() not in self.stopwords]
+		return clean_words
 
-	def save_string(self, text_string, text_filename):
-		with open(text_filename, 'w') as f:
-			f.write(text_string)
+	def __freq(self, word, doc):
+	    return doc.count(word)
+	
+	def __word_count(self, doc):
+	    return len(doc)
+	
+	def __tf(self, word, doc):
+	    return (self.__freq(word, doc) / float(self.__word_count(doc)))
+	
+	def __num_docs_containing(self, word, list_of_docs):
+	    count = 0
+	    for document in list_of_docs:
+	        if self.__freq(word, document) > 0:
+	            count += 1
+	    return 1 + count
+	
+	def __idf(self, word, list_of_docs):
+	    return math.log(len(list_of_docs) /
+	            float(self.__num_docs_containing(word, list_of_docs)))
+	
+	def __tf_idf(self, word, doc, list_of_docs):
+	    return (self.__tf(word, doc) * self.__idf(word, list_of_docs))
+
+	def get_tf_idf(self, documents):
+		#Function to calculate TF-IDF given a set of documents
+		#'documents' is an array of indexes
+		doc_results = {}
+		vocabulary = []
+		#Iterate through documents
+		for doc_index in documents:
+			tokens = self.__get_words(self.extract_text(self.read_xml(doc_index)))
+			final_tokens = tokens #final_tokens may change if adding bi/tri-grams
+			
+			#Initialise dictionary to store results
+			doc_results[doc_index] = {'freq': {}, 'tf': {}, 'idf': {},
+			 'tf-idf': {}, 'tokens': []}
+                        
+			for token in final_tokens:
+				#The frequency computed for each document
+				doc_results[doc_index]['freq'][token] = self.__freq(token, final_tokens)
+				#The term-frequency (Normalized Frequency)
+				doc_results[doc_index]['tf'][token] = self.__tf(token, final_tokens)
+				doc_results[doc_index]['tokens'] = final_tokens
+		
+			vocabulary.append(final_tokens)
+		
+		for doc_index in documents:
+			for token in doc_results[doc_index]['tf']:
+				#The Inverse-Document-Frequency
+				doc_results[doc_index]['idf'][token] = self.__idf(token, vocabulary)
+				#The tf-idf
+				doc_results[doc_index]['tf-idf'][token] = self.__tf_idf(token, doc_results[doc_index]['tokens'], vocabulary)
+		
+		#Now let's find out the most relevant words by tf-idf.
+		words = {}
+		for doc_index in documents:
+		    for token in doc_results[doc_index]['tf-idf']:
+		        if token not in words:
+		            words[token] = doc_results[doc_index]['tf-idf'][token]
+		        else:
+		            if doc_results[doc_index]['tf-idf'][token] > words[token]:
+		                words[token] = doc_results[doc_index]['tf-idf'][token]
+		
+		    print doc_index
+		    for token in doc_results[doc_index]['tf-idf']:
+		        print token, doc_results[doc_index]['tf-idf'][token]
+		
+		for item in sorted(words.items(), key=lambda x: x[1], reverse=True):
+		    print "%f <= %s" % (item[1], item[0])
+		
+		#porter = stem.porter.PorterStemmer()
+		##stem here? - stemming using porter
+		#vocab = [porter.stem(w.lower()) for w in words if w.isalpha()]
+		
+		##add to FreqDist here?
+		#for stem_word in vocab:
+			#f_dist.inc(stem_word)
+			
+		##Save state in picke file
+		#with open("freqdist.pkl", "wb") as f:
+			#pickle.dump(f_dist, f)
+
+	#def save_string(self, text_string, text_filename):
+		#with open(text_filename, 'w') as f:
+			#f.write(text_string)
 
  
 
